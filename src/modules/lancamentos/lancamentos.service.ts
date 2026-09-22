@@ -1,3 +1,4 @@
+import { FilterLancamentoDto } from './dto/filter-lancamento.dto';
 import {
   BadRequestException,
   Injectable,
@@ -70,18 +71,46 @@ export class LancamentosService {
   /**
    * Lista simples (compatibilidade com chamadas antigas).
    */
-  async listar(tenantId: string, empresaId: string, competencia?: string) {
-    return this.prisma.lancamento.findMany({
-      where: {
-        tenantId,
-        empresaId,
-        ...(competencia && { competencia: new Date(competencia) }),
+
+
+
+async listar(tenantId: string, filtro: FilterLancamentoDto) {
+  const { empresaId, competencia, page, limit } = filtro;
+
+  const where = {
+    tenantId,
+    empresaId,
+    status: 'ATIVO' as const,
+    ...(competencia && { competencia: new Date(competencia) }),
+  };
+
+  const [data, total] = await this.prisma.$transaction([
+    this.prisma.lancamento.findMany({
+      where,
+      include: {
+        partidas: {
+          include: { conta: { select: { id: true, codigo: true, nome: true } } },
+        },
       },
-      include: { partidas: true },
-      orderBy: { dataLancamento: 'desc' },
-      take: 500,
-    });
-  }
+      orderBy: [{ dataLancamento: 'desc' }, { numero: 'desc' }],
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+    this.prisma.lancamento.count({ where }),
+  ]);
+
+  return {
+    data,
+    meta: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      hasNext: page * limit < total,
+      hasPrev: page > 1,
+    },
+  };
+}
 
   async buscarPorId(tenantId: string, id: string) {
     const lancamento = await this.prisma.lancamento.findFirst({

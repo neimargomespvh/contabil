@@ -47,6 +47,7 @@ export class LancamentosController {
     );
   }
 
+ 
   @Get(':id')
   @RequirePermissions(PERMISSIONS.LANCAMENTO_VER)
   buscar(

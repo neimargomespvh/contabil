@@ -1,0 +1,5 @@
+@Get()
+@RequirePermissions('lancamento.ver')
+listar(@CurrentTenant() t: string, @Query() filtro: FilterLancamentoDto) {
+  return this.service.listar(t, filtro);
+}

@@ -1,0 +1,32 @@
+src/
+├── common/
+│   └── constants/
+│       └── permissions.constants.ts       ← lista mestra de permissões
+│
+└── modules/
+    ├── permissions/
+    │   ├── permissions.module.ts
+    │   ├── permissions.controller.ts
+    │   └── permissions.service.ts
+    │
+    ├── roles/
+    │   ├── roles.module.ts
+    │   ├── roles.controller.ts
+    │   ├── roles.service.ts
+    │   └── dto/
+    │       ├── create-role.dto.ts
+    │       ├── update-role.dto.ts
+    │       └── assign-permissions.dto.ts
+    │
+    ├── users/
+    │   ├── users.module.ts
+    │   ├── users.controller.ts
+    │   ├── users.service.ts
+    │   └── dto/
+    │       ├── create-user.dto.ts
+    │       ├── update-user.dto.ts
+    │       ├── change-password.dto.ts
+    │       └── filter-user.dto.ts
+    │
+    └── auth/
+        └── auth.service.ts                ← atualizado para criar roles padrão

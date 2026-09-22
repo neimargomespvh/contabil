@@ -1,0 +1,20 @@
+name: Deploy
+on: { push: { tags: ['v*.*.*'] } }
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: sa-east-1
+      - uses: aws-actions/amazon-ecr-login@v2
+        id: ecr
+      - run: |
+          docker build -t ${{ steps.ecr.outputs.registry }}/contabil-api:${{ github.ref_name }} .
+          docker push ${{ steps.ecr.outputs.registry }}/contabil-api:${{ github.ref_name }}
+      - run: |
+          aws ecs update-service --cluster contabil-cluster --service contabil-api --force-new-deployment
+          aws ecs wait services-stable --cluster contabil-cluster --services contabil-api

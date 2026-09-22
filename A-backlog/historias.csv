@@ -1,0 +1,14 @@
+Epico,ID,Historia,Prioridade,StoryPoints
+E01,AUTH-01,Login com email e senha,Alta,3
+E01,AUTH-02,Renovar sessão com refresh token,Alta,2
+E02,USER-01,Criar usuário com perfil,Alta,3
+E03,EMP-01,Cadastrar empresa com CNPJ,Alta,5
+E03,EMP-02,Cadastrar sócios com participação,Alta,3
+E04,PC-01,Criar plano de contas personalizado,Alta,5
+E04,PC-02,Importar plano padrão,Média,5
+E05,LAN-01,Lançar partidas dobradas,Alta,8
+E05,LAN-02,Estornar lançamento,Alta,5
+E06,XML-01,Importar XML de NFe,Alta,8
+E07,CONC-01,Importar extrato OFX,Alta,5
+E08,APU-01,Calcular DAS do Simples,Alta,8
+E09,REL-01,Emitir balancete,Média,5

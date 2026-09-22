@@ -1,0 +1,2 @@
+{ "dataMovimento": "2026-09-20T...", "descricao": "RECEBIMENTO CLIENTE XYZ", "valor": "1000", "tipo": "C", "conciliado": false }
+{ "dataMovimento": "2026-09-15T...", "descricao": "PAGAMENTO FORNECEDOR ABC", "valor": "-150.5", "tipo": "D", "conciliado": false }

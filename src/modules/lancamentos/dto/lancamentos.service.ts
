@@ -1,0 +1,25 @@
+async listar(tenantId: string, filtro: FilterLancamentoDto) {
+  const { empresaId, competencia, page, limit } = filtro;
+  const where = {
+    tenantId,
+    empresaId,
+    status: 'ATIVO' as const,
+    ...(competencia && { competencia: new Date(competencia) }),
+  };
+
+  const [data, total] = await this.prisma.$transaction([
+    this.prisma.lancamento.findMany({
+      where,
+      include: { partidas: true },
+      orderBy: { dataLancamento: 'desc' },
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+    this.prisma.lancamento.count({ where }),
+  ]);
+
+  return {
+    data,
+    meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+  };
+}

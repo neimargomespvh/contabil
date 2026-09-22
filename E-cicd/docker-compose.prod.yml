@@ -1,0 +1,15 @@
+version: '3.9'
+services:
+  api:
+    image: ${ECR_REGISTRY}/contabil-api:${TAG}
+    restart: always
+    ports: ['3000:3000']
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: ${REDIS_URL}
+    depends_on: [redis]
+  redis:
+    image: redis:7-alpine
+    restart: always

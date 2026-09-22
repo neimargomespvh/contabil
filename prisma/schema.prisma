@@ -1,0 +1,810 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum TenantStatus {
+  ATIVO
+  SUSPENSO
+  CANCELADO
+}
+
+enum UserStatus {
+  ATIVO
+  INATIVO
+}
+
+enum EmpresaStatus {
+  ATIVA
+  INATIVA
+  BAIXADA
+}
+
+enum RegimeTributario {
+  SIMPLES
+  PRESUMIDO
+  REAL
+  MEI
+}
+
+enum AnexoSimples {
+  I
+  II
+  III
+  IV
+  V
+}
+
+enum NaturezaConta {
+  ATIVO
+  PASSIVO
+  PATRIMONIO_LIQUIDO
+  RECEITA
+  DESPESA
+  CUSTO
+}
+
+enum TipoConta {
+  SINTETICA
+  ANALITICA
+}
+
+enum StatusGenerico {
+  ATIVO
+  INATIVO
+}
+
+enum TipoLote {
+  MANUAL
+  IMPORTACAO
+  AUTOMATICO
+}
+
+enum StatusLote {
+  RASCUNHO
+  CONFIRMADO
+  ESTORNADO
+}
+
+enum StatusLancamento {
+  ATIVO
+  ESTORNADO
+}
+
+enum TipoPartida {
+  D
+  C
+}
+
+enum TipoDocumentoFiscal {
+  NFE
+  NFCE
+  CTE
+  NFSE
+}
+
+enum SituacaoDocumentoFiscal {
+  AUTORIZADA
+  CANCELADA
+  DENEGADA
+  INUTILIZADA
+}
+
+enum TipoContaBancaria {
+  CORRENTE
+  POUPANCA
+  INVESTIMENTO
+}
+
+enum OrigemImportacao {
+  OFX
+  CSV
+  OPEN_FINANCE
+}
+
+enum StatusApuracao {
+  CALCULADA
+  TRANSMITIDA
+  PAGA
+}
+
+enum TipoImposto {
+  IRPJ
+  CSLL
+  PIS
+  COFINS
+  ISS
+  ICMS
+  DAS
+  IBS
+  CBS
+  IS
+}
+
+enum TipoGuia {
+  DAS
+  DARF
+  GPS
+  ISS
+  FGTS
+}
+
+enum StatusGuia {
+  GERADA
+  PAGA
+  VENCIDA
+  CANCELADA
+}
+
+enum TipoFechamento {
+  ABERTO
+  FECHADO
+}
+
+enum OperadorRegra {
+  CONTEM
+  IGUAL
+  REGEX
+  COMECA_COM
+  TERMINA_COM
+}
+
+// ============================================================
+// BLOCO 1 — TENANCY E SEGURANÇA
+// ============================================================
+
+model Tenant {
+  id        String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nome      String       @db.VarChar(200)
+  cnpj      String?      @unique @db.VarChar(14)
+  email     String?      @db.VarChar(200)
+  telefone  String?      @db.VarChar(20)
+  plano     String?      @db.VarChar(50)
+  status    TenantStatus @default(ATIVO)
+  createdAt DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  users              User[]
+  roles              Role[]
+  auditLogs          AuditLog[]
+  empresas           Empresa[]
+  lotesLancamento    LoteLancamento[]
+  lancamentos        Lancamento[]
+  partidas           Partida[]
+  documentosFiscais  DocumentoFiscal[]
+  itensDocumento     ItemDocumentoFiscal[]
+  regrasContab       RegraContabilizacao[]
+  contasBancarias    ContaBancaria[]
+  extratosBancarios  ExtratoBancario[]
+  regrasConciliacao  RegraConciliacao[]
+  apuracoes          Apuracao[]
+  apuracoesImpostos  ApuracaoImposto[]
+  guias              Guia[]
+  fechamentosPeriodo FechamentoPeriodo[]
+  planosContas       PlanoContas[]
+  contas             Conta[]
+  centrosCusto       CentroCusto[]
+  historicosPadrao   HistoricoPadrao[]
+
+  @@map("tenants")
+}
+
+model User {
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String     @map("tenant_id") @db.Uuid
+  nome         String     @db.VarChar(200)
+  email        String     @db.VarChar(200)
+  senhaHash    String     @map("senha_hash") @db.VarChar(255)
+  mfaSecret    String?    @map("mfa_secret") @db.VarChar(255)
+  status       UserStatus @default(ATIVO)
+  ultimoAcesso DateTime?  @map("ultimo_acesso") @db.Timestamptz(6)
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userRoles      UserRole[]
+  auditLogs      AuditLog[]
+  lotesLancamento LoteLancamento[]
+  fechamentos    FechamentoPeriodo[]
+
+  @@unique([tenantId, email], name: "uk_user_tenant_email")
+  @@index([tenantId])
+  @@map("users")
+}
+
+model Role {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  nome        String   @db.VarChar(50)
+  descricao   String?  @db.VarChar(200)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userRoles       UserRole[]
+  rolePermissions RolePermission[]
+
+  @@unique([tenantId, nome], name: "uk_role_tenant_nome")
+  @@map("roles")
+}
+
+model Permission {
+  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  codigo    String @unique @db.VarChar(100)
+  descricao String? @db.VarChar(200)
+
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String @map("role_id") @db.Uuid
+  permissionId String @map("permission_id") @db.Uuid
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  userId String @map("user_id") @db.Uuid
+  roleId String @map("role_id") @db.Uuid
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+model AuditLog {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  userId       String?  @map("user_id") @db.Uuid
+  entidade     String   @db.VarChar(100)
+  entidadeId   String?  @map("entidade_id") @db.Uuid
+  acao         String   @db.VarChar(20)
+  payloadAntes Json?    @map("payload_antes")
+  payloadDepois Json?   @map("payload_depois")
+  ip           String?  @db.Inet
+  userAgent    String?  @map("user_agent")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, entidade, entidadeId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ============================================================
+// BLOCO 2 — EMPRESAS E SÓCIOS
+// ============================================================
+
+model Empresa {
+  id                 String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId           String           @map("tenant_id") @db.Uuid
+  razaoSocial        String           @map("razao_social") @db.VarChar(200)
+  nomeFantasia       String?          @map("nome_fantasia") @db.VarChar(200)
+  cnpj               String           @db.VarChar(14)
+  inscricaoEstadual  String?          @map("inscricao_estadual") @db.VarChar(20)
+  inscricaoMunicipal String?          @map("inscricao_municipal") @db.VarChar(20)
+  regimeTributario   RegimeTributario @map("regime_tributario")
+  anexoSimples       AnexoSimples?    @map("anexo_simples")
+  cnaePrincipal      String?          @map("cnae_principal") @db.VarChar(10)
+  cnaesSecundarios   Json?            @map("cnaes_secundarios")
+  dataAbertura       DateTime?        @map("data_abertura") @db.Date
+  dataRegimeAtual    DateTime?        @map("data_regime_atual") @db.Date
+  endereco           Json?
+  email              String?          @db.VarChar(200)
+  telefone           String?          @db.VarChar(20)
+  responsavelNome    String?          @map("responsavel_nome") @db.VarChar(200)
+  responsavelCpf     String?          @map("responsavel_cpf") @db.VarChar(11)
+  status             EmpresaStatus    @default(ATIVA)
+  observacoes        String?
+  createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt          DateTime?        @map("deleted_at") @db.Timestamptz(6)
+
+  tenant              Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  socios              Socio[]
+  planosContas        PlanoContas[]
+  centrosCusto        CentroCusto[]
+  historicosPadrao    HistoricoPadrao[]
+  lotesLancamento     LoteLancamento[]
+  lancamentos         Lancamento[]
+  documentosFiscais   DocumentoFiscal[]
+  regrasContab        RegraContabilizacao[]
+  contasBancarias     ContaBancaria[]
+  regrasConciliacao   RegraConciliacao[]
+  apuracoes           Apuracao[]
+  guias               Guia[]
+  fechamentosPeriodo  FechamentoPeriodo[]
+
+  @@unique([tenantId, cnpj], name: "uk_empresa_tenant_cnpj")
+  @@index([tenantId, status])
+  @@map("empresas")
+}
+
+model Socio {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  empresaId    String    @map("empresa_id") @db.Uuid
+  nome         String    @db.VarChar(200)
+  cpf          String    @db.VarChar(11)
+  participacao Decimal   @db.Decimal(9, 6)
+  proLabore    Decimal?  @map("pro_labore") @db.Decimal(18, 2)
+  dataEntrada  DateTime? @map("data_entrada") @db.Date
+  dataSaida    DateTime? @map("data_saida") @db.Date
+  status       String    @default("ativo") @db.VarChar(20)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  @@unique([empresaId, cpf], name: "uk_socio_empresa_cpf")
+  @@map("socios")
+}
+
+// ============================================================
+// BLOCO 3 — PLANO DE CONTAS E LANÇAMENTOS
+// ============================================================
+
+model PlanoContas {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  empresaId      String   @map("empresa_id") @db.Uuid
+  nome           String   @db.VarChar(200)
+  versao         Int
+  vigenciaInicio DateTime @map("vigencia_inicio") @db.Date
+  vigenciaFim    DateTime? @map("vigencia_fim") @db.Date
+  status         StatusGenerico @default(ATIVO)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  contas  Conta[]
+
+  @@unique([empresaId, versao], name: "uk_plano_empresa_versao")
+  @@map("plano_contas")
+}
+
+model Conta {
+  id              String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String         @map("tenant_id") @db.Uuid
+  planoContasId   String         @map("plano_contas_id") @db.Uuid
+  contaPaiId      String?        @map("conta_pai_id") @db.Uuid
+  codigo          String         @db.VarChar(30)
+  nome            String         @db.VarChar(200)
+  natureza        NaturezaConta
+  tipo            TipoConta
+  grau            Int
+  aceitaLancamento Boolean       @map("aceita_lancamento")
+  dreLinha        String?        @map("dre_linha") @db.VarChar(50)
+  status          StatusGenerico @default(ATIVO)
+  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tenant           Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  planoContas      PlanoContas        @relation(fields: [planoContasId], references: [id], onDelete: Cascade)
+  contaPai         Conta?             @relation("HierarquiaContas", fields: [contaPaiId], references: [id])
+  contasFilhas     Conta[]            @relation("HierarquiaContas")
+  partidas         Partida[]
+  historicosDebito HistoricoPadrao[]  @relation("HistoricoDebito")
+  historicosCredito HistoricoPadrao[] @relation("HistoricoCredito")
+  regrasDebito     RegraContabilizacao[] @relation("RegraDebito")
+  regrasCredito    RegraContabilizacao[] @relation("RegraCredito")
+  contasBancarias  ContaBancaria[]
+  regrasConcDebito RegraConciliacao[] @relation("RegraConcDebito")
+  regrasConcCredito RegraConciliacao[] @relation("RegraConcCredito")
+
+  @@unique([planoContasId, codigo], name: "uk_conta_plano_codigo")
+  @@index([tenantId])
+  @@index([contaPaiId])
+  @@map("contas")
+}
+
+model CentroCusto {
+  id        String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String         @map("tenant_id") @db.Uuid
+  empresaId String         @map("empresa_id") @db.Uuid
+  codigo    String         @db.VarChar(30)
+  nome      String         @db.VarChar(200)
+  status    StatusGenerico @default(ATIVO)
+  createdAt DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  empresa   Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  partidas  Partida[]
+
+  @@unique([empresaId, codigo], name: "uk_cc_empresa_codigo")
+  @@map("centros_custo")
+}
+
+model HistoricoPadrao {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  empresaId      String   @map("empresa_id") @db.Uuid
+  codigo         String?  @db.VarChar(20)
+  descricao      String   @db.VarChar(500)
+  contaDebitoId  String?  @map("conta_debito_id") @db.Uuid
+  contaCreditoId String?  @map("conta_credito_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant       Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  empresa      Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  contaDebito  Conta?  @relation("HistoricoDebito", fields: [contaDebitoId], references: [id])
+  contaCredito Conta?  @relation("HistoricoCredito", fields: [contaCreditoId], references: [id])
+
+  @@map("historicos_padrao")
+}
+
+model LoteLancamento {
+  id           String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String      @map("tenant_id") @db.Uuid
+  empresaId    String      @map("empresa_id") @db.Uuid
+  tipo         TipoLote
+  origem       String?     @db.VarChar(100)
+  competencia  DateTime    @db.Date
+  status       StatusLote  @default(RASCUNHO)
+  usuarioId    String?     @map("usuario_id") @db.Uuid
+  createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tenant     Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  empresa    Empresa      @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  usuario    User?        @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+  lancamentos Lancamento[]
+
+  @@index([empresaId, competencia])
+  @@index([status])
+  @@map("lotes_lancamento")
+}
+
+model Lancamento {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String           @map("tenant_id") @db.Uuid
+  empresaId      String           @map("empresa_id") @db.Uuid
+  loteId         String?          @map("lote_id") @db.Uuid
+  numero         BigInt           @default(autoincrement())
+  dataLancamento DateTime         @map("data_lancamento") @db.Date
+  competencia    DateTime         @db.Date
+  historico      String           @db.VarChar(500)
+  documentoRef   String?          @map("documento_ref") @db.VarChar(100)
+  valorTotal     Decimal          @map("valor_total") @db.Decimal(18, 2)
+  status         StatusLancamento @default(ATIVO)
+  estornoDeId    String?          @map("estorno_de_id") @db.Uuid
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  empresa      Empresa       @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  lote         LoteLancamento? @relation(fields: [loteId], references: [id], onDelete: SetNull)
+  estornoDe    Lancamento?   @relation("Estorno", fields: [estornoDeId], references: [id])
+  estornos     Lancamento[]  @relation("Estorno")
+  partidas     Partida[]
+  documentos   DocumentoFiscal[]
+  extratos     ExtratoBancario[]
+
+  @@index([empresaId, competencia])
+  @@index([empresaId, dataLancamento])
+  @@index([loteId])
+  @@map("lancamentos")
+}
+
+model Partida {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String       @map("tenant_id") @db.Uuid
+  lancamentoId   String       @map("lancamento_id") @db.Uuid
+  contaId        String       @map("conta_id") @db.Uuid
+  centroCustoId  String?      @map("centro_custo_id") @db.Uuid
+  tipo           TipoPartida
+  valor          Decimal      @db.Decimal(18, 2)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  lancamento  Lancamento   @relation(fields: [lancamentoId], references: [id], onDelete: Cascade)
+  conta       Conta        @relation(fields: [contaId], references: [id])
+  centroCusto CentroCusto? @relation(fields: [centroCustoId], references: [id])
+
+  @@index([lancamentoId])
+  @@index([contaId])
+  @@index([tenantId, contaId])
+  @@map("partidas")
+}
+
+model FechamentoPeriodo {
+  id           String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String         @map("tenant_id") @db.Uuid
+  empresaId    String         @map("empresa_id") @db.Uuid
+  competencia  DateTime       @db.Date
+  status       TipoFechamento @default(ABERTO)
+  fechadoPor   String?        @map("fechado_por") @db.Uuid
+  fechadoEm    DateTime?      @map("fechado_em") @db.Timestamptz(6)
+  createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  usuario User?   @relation(fields: [fechadoPor], references: [id], onDelete: SetNull)
+
+  @@unique([empresaId, competencia], name: "uk_fechamento_empresa_comp")
+  @@map("fechamentos_periodo")
+}
+
+// ============================================================
+// BLOCO 4 — DOCUMENTOS FISCAIS
+// ============================================================
+
+model DocumentoFiscal {
+  id                 String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId           String                    @map("tenant_id") @db.Uuid
+  empresaId          String                    @map("empresa_id") @db.Uuid
+  tipo               TipoDocumentoFiscal
+  chaveAcesso        String?                   @map("chave_acesso") @db.VarChar(44)
+  numero             String?                   @db.VarChar(20)
+  serie              String?                   @db.VarChar(10)
+  modelo             String?                   @db.VarChar(5)
+  emitenteCnpj       String?                   @map("emitente_cnpj") @db.VarChar(14)
+  emitenteNome       String?                   @map("emitente_nome") @db.VarChar(200)
+  destinatarioCnpj   String?                   @map("destinatario_cnpj") @db.VarChar(14)
+  destinatarioNome   String?                   @map("destinatario_nome") @db.VarChar(200)
+  dataEmissao        DateTime                  @map("data_emissao") @db.Timestamptz(6)
+  valorTotal         Decimal                   @map("valor_total") @db.Decimal(18, 2)
+  valorIcms          Decimal?                  @map("valor_icms") @db.Decimal(18, 2)
+  valorPis           Decimal?                  @map("valor_pis") @db.Decimal(18, 2)
+  valorCofins        Decimal?                  @map("valor_cofins") @db.Decimal(18, 2)
+  valorIss           Decimal?                  @map("valor_iss") @db.Decimal(18, 2)
+  valorIbs           Decimal?                  @map("valor_ibs") @db.Decimal(18, 2)
+  valorCbs           Decimal?                  @map("valor_cbs") @db.Decimal(18, 2)
+  valorIs            Decimal?                  @map("valor_is") @db.Decimal(18, 2)
+  cfopPrincipal      String?                   @map("cfop_principal") @db.VarChar(5)
+  ncmPrincipal       String?                   @map("ncm_principal") @db.VarChar(10)
+  situacao           SituacaoDocumentoFiscal   @default(AUTORIZADA)
+  xmlS3Key           String?                   @map("xml_s3_key") @db.VarChar(500)
+  xmlHash            String?                   @map("xml_hash") @db.VarChar(64)
+  lancamentoId       String?                   @map("lancamento_id") @db.Uuid
+  importadoEm        DateTime                  @default(now()) @map("importado_em") @db.Timestamptz(6)
+  createdAt          DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tenant     Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  empresa    Empresa               @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  lancamento Lancamento?           @relation(fields: [lancamentoId], references: [id], onDelete: SetNull)
+  itens      ItemDocumentoFiscal[]
+
+  @@unique([tenantId, chaveAcesso], name: "uk_doc_tenant_chave")
+  @@index([empresaId, dataEmissao])
+  @@index([empresaId, situacao])
+  @@map("documentos_fiscais")
+}
+
+model ItemDocumentoFiscal {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  documentoId    String   @map("documento_id") @db.Uuid
+  numeroItem     Int      @map("numero_item")
+  codigoProduto  String?  @map("codigo_produto") @db.VarChar(60)
+  descricao      String?  @db.VarChar(500)
+  ncm            String?  @db.VarChar(10)
+  cfop           String?  @db.VarChar(5)
+  quantidade     Decimal? @db.Decimal(18, 4)
+  valorUnitario  Decimal? @map("valor_unitario") @db.Decimal(18, 6)
+  valorTotal     Decimal? @map("valor_total") @db.Decimal(18, 2)
+  valorIcms      Decimal? @map("valor_icms") @db.Decimal(18, 2)
+  aliquotaIcms   Decimal? @map("aliquota_icms") @db.Decimal(9, 6)
+  valorPis       Decimal? @map("valor_pis") @db.Decimal(18, 2)
+  valorCofins    Decimal? @map("valor_cofins") @db.Decimal(18, 2)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant    Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  documento DocumentoFiscal @relation(fields: [documentoId], references: [id], onDelete: Cascade)
+
+  @@unique([documentoId, numeroItem], name: "uk_item_doc_num")
+  @@map("itens_documento_fiscal")
+}
+
+model RegraContabilizacao {
+  id                String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId          String         @map("tenant_id") @db.Uuid
+  empresaId         String         @map("empresa_id") @db.Uuid
+  nome              String         @db.VarChar(200)
+  prioridade        Int
+  condicao          Json
+  contaDebitoId     String         @map("conta_debito_id") @db.Uuid
+  contaCreditoId    String         @map("conta_credito_id") @db.Uuid
+  historicoTemplate String?        @map("historico_template") @db.VarChar(500)
+  status            StatusGenerico @default(ATIVO)
+  createdAt         DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant       Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  empresa      Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  contaDebito  Conta   @relation("RegraDebito", fields: [contaDebitoId], references: [id])
+  contaCredito Conta   @relation("RegraCredito", fields: [contaCreditoId], references: [id])
+
+  @@index([empresaId, prioridade])
+  @@map("regras_contabilizacao")
+}
+
+// ============================================================
+// BLOCO 5 — CONCILIAÇÃO BANCÁRIA
+// ============================================================
+
+model Banco {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  codigo    String   @unique @db.VarChar(10)
+  nome      String   @db.VarChar(100)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  contasBancarias ContaBancaria[]
+
+  @@map("bancos")
+}
+
+model ContaBancaria {
+  id                String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId          String            @map("tenant_id") @db.Uuid
+  empresaId         String            @map("empresa_id") @db.Uuid
+  bancoId           String            @map("banco_id") @db.Uuid
+  agencia           String?           @db.VarChar(20)
+  numeroConta       String?           @map("numero_conta") @db.VarChar(30)
+  digito            String?           @db.VarChar(5)
+  tipo              TipoContaBancaria @default(CORRENTE)
+  contaContabilId   String?           @map("conta_contabil_id") @db.Uuid
+  saldoInicial      Decimal?          @map("saldo_inicial") @db.Decimal(18, 2)
+  dataSaldoInicial  DateTime?         @map("data_saldo_inicial") @db.Date
+  status            StatusGenerico    @default(ATIVO)
+  createdAt         DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant        Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  empresa       Empresa           @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  banco         Banco             @relation(fields: [bancoId], references: [id])
+  contaContabil Conta?            @relation(fields: [contaContabilId], references: [id])
+  extratos      ExtratoBancario[]
+
+  @@unique([empresaId, bancoId, agencia, numeroConta], name: "uk_ccb_empresa_banco")
+  @@map("contas_bancarias")
+}
+
+model ExtratoBancario {
+  id                String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId          String            @map("tenant_id") @db.Uuid
+  contaBancariaId   String            @map("conta_bancaria_id") @db.Uuid
+  dataMovimento     DateTime          @map("data_movimento") @db.Date
+  descricao         String?           @db.VarChar(500)
+  documento         String?           @db.VarChar(100)
+  valor             Decimal           @db.Decimal(18, 2)
+  tipo              String?           @db.Char(1)
+  origemImportacao  OrigemImportacao  @map("origem_importacao")
+  hashUnico         String            @unique @map("hash_unico") @db.VarChar(64)
+  conciliado        Boolean           @default(false)
+  lancamentoId      String?           @map("lancamento_id") @db.Uuid
+  createdAt         DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant        Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contaBancaria ContaBancaria @relation(fields: [contaBancariaId], references: [id], onDelete: Cascade)
+  lancamento    Lancamento? @relation(fields: [lancamentoId], references: [id], onDelete: SetNull)
+
+  @@index([contaBancariaId, dataMovimento])
+  @@index([conciliado])
+  @@map("extratos_bancarios")
+}
+
+model RegraConciliacao {
+  id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String         @map("tenant_id") @db.Uuid
+  empresaId      String         @map("empresa_id") @db.Uuid
+  nome           String?        @db.VarChar(200)
+  campo          String?        @db.VarChar(50)
+  operador       OperadorRegra?
+  valorBusca     String?        @map("valor_busca") @db.VarChar(200)
+  contaDebitoId  String?        @map("conta_debito_id") @db.Uuid
+  contaCreditoId String?        @map("conta_credito_id") @db.Uuid
+  prioridade     Int?
+  status         StatusGenerico @default(ATIVO)
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant       Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  empresa      Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  contaDebito  Conta?  @relation("RegraConcDebito", fields: [contaDebitoId], references: [id])
+  contaCredito Conta?  @relation("RegraConcCredito", fields: [contaCreditoId], references: [id])
+
+  @@map("regras_conciliacao")
+}
+
+// ============================================================
+// BLOCO 6 — APURAÇÃO TRIBUTÁRIA
+// ============================================================
+
+model Apuracao {
+  id            String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String           @map("tenant_id") @db.Uuid
+  empresaId     String           @map("empresa_id") @db.Uuid
+  competencia   DateTime         @db.Date
+  regime        RegimeTributario
+  anexoSimples  AnexoSimples?    @map("anexo_simples")
+  receitaBruta  Decimal?         @map("receita_bruta") @db.Decimal(18, 2)
+  baseCalculo   Decimal?         @map("base_calculo") @db.Decimal(18, 2)
+  aliquota      Decimal?         @db.Decimal(9, 6)
+  valorDevido   Decimal?         @map("valor_devido") @db.Decimal(18, 2)
+  valorDeducao  Decimal?         @map("valor_deducao") @db.Decimal(18, 2)
+  valorAPagar   Decimal?         @map("valor_a_pagar") @db.Decimal(18, 2)
+  status        StatusApuracao   @default(CALCULADA)
+  createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  empresa          Empresa           @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  impostos         ApuracaoImposto[]
+  guias            Guia[]
+
+  @@unique([empresaId, competencia, regime], name: "uk_apuracao_emp_comp_regime")
+  @@map("apuracoes")
+}
+
+model ApuracaoImposto {
+  id          String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String      @map("tenant_id") @db.Uuid
+  apuracaoId  String      @map("apuracao_id") @db.Uuid
+  imposto     TipoImposto
+  baseCalculo Decimal?    @map("base_calculo") @db.Decimal(18, 2)
+  aliquota    Decimal?    @db.Decimal(9, 6)
+  valor       Decimal?    @db.Decimal(18, 2)
+  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  apuracao Apuracao @relation(fields: [apuracaoId], references: [id], onDelete: Cascade)
+
+  @@map("apuracoes_impostos")
+}
+
+model Guia {
+  id               String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId         String      @map("tenant_id") @db.Uuid
+  empresaId        String      @map("empresa_id") @db.Uuid
+  apuracaoId       String?     @map("apuracao_id") @db.Uuid
+  tipo             TipoGuia
+  codigoReceita    String?     @map("codigo_receita") @db.VarChar(10)
+  periodoApuracao  DateTime?   @map("periodo_apuracao") @db.Date
+  vencimento       DateTime    @db.Date
+  valor            Decimal     @db.Decimal(18, 2)
+  numeroDocumento  String?     @map("numero_documento") @db.VarChar(50)
+  status           StatusGuia  @default(GERADA)
+  pdfS3Key         String?     @map("pdf_s3_key") @db.VarChar(500)
+  pagoEm           DateTime?   @map("pago_em") @db.Date
+  createdAt        DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  empresa  Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  apuracao Apuracao? @relation(fields: [apuracaoId], references: [id], onDelete: SetNull)
+
+  @@index([empresaId, vencimento])
+  @@index([status])
+  @@map("guias")
+}
+
+model TabelaTributaria {
+  id             String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  regime         RegimeTributario
+  anexo          AnexoSimples?
+  faixa          Int
+  valorInicial   Decimal?        @map("valor_inicial") @db.Decimal(18, 2)
+  valorFinal     Decimal?        @map("valor_final") @db.Decimal(18, 2)
+  aliquota       Decimal?        @db.Decimal(9, 6)
+  parcelaDeduzir Decimal?        @map("parcela_deduzir") @db.Decimal(18, 2)
+  vigenciaInicio DateTime        @map("vigencia_inicio") @db.Date
+  vigenciaFim    DateTime?       @map("vigencia_fim") @db.Date
+
+  @@index([regime, anexo, vigenciaInicio])
+  @@map("tabelas_tributarias")
+}

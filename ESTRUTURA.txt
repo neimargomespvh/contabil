@@ -1,0 +1,11 @@
+src/
+├── common/         # Decorators, guards, interceptors, filters
+├── config/         # Configurações
+├── infra/          # Prisma, Redis, S3, filas
+└── modules/        # Domínios de negócio
+    ├── auth/
+    ├── users/
+    ├── empresas/
+    ├── plano-contas/
+    ├── lancamentos/
+    └── ...

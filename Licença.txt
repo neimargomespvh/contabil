@@ -1,0 +1,5 @@
+
+## A2.5 — Ver o que vai ser commitado
+
+```bash
+git status

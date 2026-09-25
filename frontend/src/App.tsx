@@ -8,6 +8,8 @@ import { EmpresasListPage } from '@/pages/empresas/EmpresasList';
 import { LancamentosListPage } from '@/pages/lancamentos/LancamentosList';
 import { LancamentoDetailPage } from '@/pages/lancamentos/LancamentoDetail';
 import { PlanoContasPage } from '@/pages/plano-contas/PlanoContas';
+import { DocumentosFiscaisPage } from '@/pages/documentos-fiscais/DocumentosFiscais';
+import { RegrasContabilizacaoPage } from '@/pages/regras-contabilizacao/RegrasContabilizacao';
 
 import { EmpresaDetailPage } from '@/pages/empresas/EmpresaDetail';
 
@@ -41,7 +43,8 @@ export function App() {
               <Route path="plano-contas" element={<PlanoContasPage />} />
               <Route path="lancamentos" element={<LancamentosListPage />} />
               <Route path="lancamentos/:id" element={<LancamentoDetailPage />} />
-              <Route path="documentos-fiscais" element={<EmBreve titulo="Documentos Fiscais" />} />
+              <Route path="documentos-fiscais" element={<DocumentosFiscaisPage />} />
+              <Route path="regras-contabilizacao" element={<RegrasContabilizacaoPage />} />
               <Route path="conciliacao" element={<EmBreve titulo="Conciliação" />} />
               <Route path="apuracoes" element={<EmBreve titulo="Apurações" />} />
               <Route path="relatorios" element={<EmBreve titulo="Relatórios" />} />

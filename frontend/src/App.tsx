@@ -7,6 +7,7 @@ import { LoginPage } from '@/pages/Login';
 import { EmpresasListPage } from '@/pages/empresas/EmpresasList';
 import { LancamentosListPage } from '@/pages/lancamentos/LancamentosList';
 import { LancamentoDetailPage } from '@/pages/lancamentos/LancamentoDetail';
+import { PlanoContasPage } from '@/pages/plano-contas/PlanoContas';
 
 import { EmpresaDetailPage } from '@/pages/empresas/EmpresaDetail';
 
@@ -37,7 +38,7 @@ export function App() {
               {/* Rotas que virão nos próximos pacotes */}
               <Route path="empresas" element={<EmpresasListPage />} />
               <Route path="empresas/:id" element={<EmpresaDetailPage />} />
-              <Route path="plano-contas" element={<EmBreve titulo="Plano de Contas" />} />
+              <Route path="plano-contas" element={<PlanoContasPage />} />
               <Route path="lancamentos" element={<LancamentosListPage />} />
               <Route path="lancamentos/:id" element={<LancamentoDetailPage />} />
               <Route path="documentos-fiscais" element={<EmBreve titulo="Documentos Fiscais" />} />

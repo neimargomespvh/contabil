@@ -1,0 +1,36 @@
+# Dependências
+node_modules
+frontend/node_modules
+
+# Build (nunca copiar dist do host)
+dist
+frontend/dist
+coverage
+*.tsbuildinfo
+
+# Git
+.git
+.github
+.gitignore
+
+# Ambiente
+.env
+.env.*
+!.env.example
+!.env.prod.example
+
+# Backups e logs
+.backup
+*.log
+
+# Scripts auxiliares
+fix-*.sh
+script*.sh
+test-api.sh
+atualizar-etapa-b.sh
+corrigir-etapa-b.sh
+diagnostico-etapa-b.sh
+*.bak
+
+# Docs
+*.md

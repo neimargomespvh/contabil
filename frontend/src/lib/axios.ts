@@ -7,16 +7,37 @@ export const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-// Interceptor de request — adiciona o token
+// ─────────────────────────────────────────────────────
+// REQUEST — injeta o token automaticamente
+// ─────────────────────────────────────────────────────
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('@contabil:token');
-  if (token) {
+  if (token && !config.headers.Authorization) {
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
 
-// Interceptor de response — trata 401 e refresh automático
+// ─────────────────────────────────────────────────────
+// HELPER — desembrulha { success, data, timestamp } → data
+// ─────────────────────────────────────────────────────
+function unwrap<T = any>(body: any): T {
+  if (
+    body &&
+    typeof body === 'object' &&
+    !Array.isArray(body) &&
+    'success' in body &&
+    'data' in body &&
+    ('timestamp' in body || 'statusCode' in body)
+  ) {
+    return body.data as T;
+  }
+  return body as T;
+}
+
+// ─────────────────────────────────────────────────────
+// RESPONSE — refresh 401 + desembrulho
+// ─────────────────────────────────────────────────────
 let isRefreshing = false;
 let failedQueue: Array<{ resolve: (v: any) => void; reject: (e: any) => void }> = [];
 
@@ -26,11 +47,26 @@ const processQueue = (error: any, token: string | null = null) => {
 };
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Nunca desembrulhar downloads binários
+    if (
+      response.config.responseType === 'blob' ||
+      response.config.responseType === 'arraybuffer'
+    ) {
+      return response;
+    }
+
+    response.data = unwrap(response.data);
+    return response;
+  },
   async (error) => {
     const original = error.config;
 
-    if (error.response?.status === 401 && !original._retry && !original.url?.includes('/auth/')) {
+    if (
+      error.response?.status === 401 &&
+      !original._retry &&
+      !original.url?.includes('/auth/')
+    ) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
@@ -51,12 +87,20 @@ api.interceptors.response.use(
       }
 
       try {
-        const { data } = await axios.post(`${API_URL}/auth/refresh`, { refreshToken });
-        const newToken = data.accessToken;
-        localStorage.setItem('@contabil:token', newToken);
-        api.defaults.headers.Authorization = `Bearer ${newToken}`;
-        processQueue(null, newToken);
-        original.headers.Authorization = `Bearer ${newToken}`;
+        // axios "cru" — o interceptor global NÃO se aplica a esta chamada,
+        // por isso desembrulhamos manualmente.
+        const refreshResponse = await axios.post(
+          `${API_URL}/auth/refresh`,
+          { refreshToken },
+        );
+        const { accessToken } = unwrap<{ accessToken: string }>(
+          refreshResponse.data,
+        );
+
+        localStorage.setItem('@contabil:token', accessToken);
+        api.defaults.headers.Authorization = `Bearer ${accessToken}`;
+        processQueue(null, accessToken);
+        original.headers.Authorization = `Bearer ${accessToken}`;
         return api(original);
       } catch (refreshError) {
         processQueue(refreshError, null);
@@ -72,11 +116,17 @@ api.interceptors.response.use(
   },
 );
 
+// ─────────────────────────────────────────────────────
+// Helper para extrair mensagem amigável de erro
+// ─────────────────────────────────────────────────────
 export function getApiError(error: any): string {
-  if (error?.response?.data?.message) {
-    const msg = error.response.data.message;
+  const body = error?.response?.data;
+
+  if (body?.message) {
+    const msg = body.message;
     return Array.isArray(msg) ? msg.join(', ') : msg;
   }
+  if (body?.error) return body.error;
   if (error?.message) return error.message;
   return 'Erro inesperado';
 }

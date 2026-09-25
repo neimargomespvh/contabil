@@ -34,6 +34,7 @@ describe('ContabilizacaoService', () => {
     cfopPrincipal: '5102',
     ncmPrincipal: '12345678',
     itens: [],
+    situacao: 'AUTORIZADA' as const,
     xmlRaw: '',
   };
 

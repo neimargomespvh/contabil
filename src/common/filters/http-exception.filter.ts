@@ -1,7 +1,22 @@
 import {
-  ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, Logger,
+  ArgumentsHost,
+  Catch,
+  ExceptionFilter,
+  HttpException,
+  HttpStatus,
+  Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+
+interface ErrorResponse {
+  success: false;
+  statusCode: number;
+  message: string | string[];
+  error: string;
+  path: string;
+  timestamp: string;
+  requestId?: string;
+}
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -12,29 +27,49 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const res = ctx.getResponse<Response>();
     const req = ctx.getRequest<Request>();
 
-    const status =
-      exception instanceof HttpException
-        ? exception.getStatus()
-        : HttpStatus.INTERNAL_SERVER_ERROR;
+    let status = HttpStatus.INTERNAL_SERVER_ERROR;
+    let message: string | string[] = 'Erro interno do servidor';
+    let error = 'InternalServerError';
 
-    const message =
-      exception instanceof HttpException
-        ? exception.getResponse()
-        : 'Erro interno do servidor';
+    if (exception instanceof HttpException) {
+      status = exception.getStatus();
+      const response = exception.getResponse();
 
+      if (typeof response === 'string') {
+        message = response;
+      } else if (typeof response === 'object' && response !== null) {
+        const resp = response as Record<string, any>;
+        message = resp.message ?? message;
+        error = resp.error ?? exception.name;
+      }
+    } else if (exception instanceof Error) {
+      message = exception.message;
+      error = exception.name;
+    }
+
+    const requestId = (req as any).id ?? req.headers['x-request-id'];
+
+    const body: ErrorResponse = {
+      success: false,
+      statusCode: status,
+      message,
+      error,
+      path: req.url,
+      timestamp: new Date().toISOString(),
+      ...(typeof requestId === 'string' && { requestId }),
+    };
+
+    // Log apenas erros 5xx (erros do cliente são esperados)
     if (status >= 500) {
+      const user = (req as any).user;
       this.logger.error(
-        `${req.method} ${req.url} - ${status} - tenant=${(req as any).user?.tenantId} - user=${(req as any).user?.id}`,
+        `${req.method} ${req.url} - ${status} - tenant=${user?.tenantId ?? '-'} user=${user?.id ?? '-'} - ${error}: ${
+          Array.isArray(message) ? message.join('; ') : message
+        }`,
         exception instanceof Error ? exception.stack : undefined,
       );
     }
 
-    res.status(status).json({
-      success: false,
-      statusCode: status,
-      message,
-      path: req.url,
-      timestamp: new Date().toISOString(),
-    });
+    res.status(status).json(body);
   }
 }

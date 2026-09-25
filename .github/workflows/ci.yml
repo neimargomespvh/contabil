@@ -1,0 +1,124 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (lint + test + build)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: contabil_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/contabil_test?schema=public
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: test-secret-64-chars-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      JWT_REFRESH_SECRET: test-refresh-64-chars-bbbbbbbbbbbbbbbbbbbbbbbbbbbb
+      JWT_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+      NODE_ENV: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Prisma generate
+        run: npx prisma generate
+
+      - name: Prisma migrate (test DB)
+        run: npx prisma migrate deploy
+        continue-on-error: true
+
+      - name: Lint
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Testes unitários
+        run: npm run test:ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Upload cobertura
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: coverage/
+          retention-days: 7
+
+  frontend:
+    name: Frontend (type-check + build)
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Type check
+        run: npm run type-check
+
+      - name: Build
+        run: npm run build
+        env:
+          VITE_API_URL: http://localhost:3000/api/v1
+
+      - name: Upload dist
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist/
+          retention-days: 7

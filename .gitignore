@@ -38,3 +38,4 @@ prisma/migrations/dev.db
 # Sistema
 .DS_Store
 Thumbs.db.env
+.env.prod

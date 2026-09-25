@@ -12,6 +12,7 @@ export class NfseParser {
       emitenteNome: inf.PrestadorServico.RazaoSocial,
       dataEmissao: new Date(inf.DataEmissao),
       valorTotal: parseFloat(inf.Servico?.Valores?.ValorServicos ?? '0'),
+      situacao: 'AUTORIZADA',
       itens: [], xmlRaw: xml,
     };
   }

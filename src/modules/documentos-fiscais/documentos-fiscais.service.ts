@@ -23,6 +23,36 @@ export class DocumentosFiscaisService {
     return this.importacao.importarXml(tenantId, dto);
   }
 
+  async importarLote(
+    tenantId: string,
+    empresaId: string,
+    xmls: string[],
+  ): Promise<{
+    total: number;
+    sucesso: number;
+    falhas: Array<{ erro: string; motivo: string }>;
+  }> {
+    let sucesso = 0;
+    const falhas: Array<{ erro: string; motivo: string }> = [];
+
+    for (const xml of xmls) {
+      try {
+        await this.importacao.importarXml(tenantId, {
+          empresaId,
+          xml,
+        } as ImportarXmlDto);
+        sucesso++;
+      } catch (err) {
+        falhas.push({
+          erro: (err as Error).name,
+          motivo: (err as Error).message,
+        });
+      }
+    }
+
+    return { total: xmls.length, sucesso, falhas };
+  }
+
   async listar(tenantId: string, filtros: FilterDocumentoDto) {
     const where: Prisma.DocumentoFiscalWhereInput = { tenantId };
 

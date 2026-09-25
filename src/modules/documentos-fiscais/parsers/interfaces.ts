@@ -1,4 +1,5 @@
 export type TipoDocumento = 'NFE' | 'NFCE' | 'CTE' | 'NFSE';
+export type SituacaoDocumento = 'AUTORIZADA' | 'CANCELADA' | 'DENEGADA' | 'INUTILIZADA';
 
 export interface DocumentoFiscalParseado {
   tipo: TipoDocumento;
@@ -18,6 +19,7 @@ export interface DocumentoFiscalParseado {
   valorIss?: number;
   cfopPrincipal?: string;
   ncmPrincipal?: string;
+  situacao: SituacaoDocumento;
   itens: ItemDocumentoParseado[];
   xmlRaw: string;
 }
@@ -38,17 +40,36 @@ export interface ItemDocumentoParseado {
 }
 
 export class XmlMalformadoError extends Error {
-  constructor(message = 'XML malformado') { super(message); this.name = 'XmlMalformadoError'; }
+  constructor(message = 'XML malformado') {
+    super(message);
+    this.name = 'XmlMalformadoError';
+  }
 }
+
 export class DocumentoDuplicadoError extends Error {
-  constructor(chave: string) { super(`Chave ${chave} já importada`); this.name = 'DocumentoDuplicadoError'; }
+  constructor(chave: string) {
+    super(`Chave ${chave} já importada`);
+    this.name = 'DocumentoDuplicadoError';
+  }
 }
+
 export class SchemaInvalidoError extends Error {
-  constructor(message = 'Schema inválido') { super(message); this.name = 'SchemaInvalidoError'; }
+  constructor(message = 'Schema inválido') {
+    super(message);
+    this.name = 'SchemaInvalidoError';
+  }
 }
+
 export class CamposObrigatoriosError extends Error {
   constructor(campos: string[]) {
     super(`Campos obrigatórios faltantes: ${campos.join(', ')}`);
     this.name = 'CamposObrigatoriosError';
+  }
+}
+
+export class ChaveInvalidaError extends Error {
+  constructor(chave: string) {
+    super(`Chave de acesso inválida: ${chave}`);
+    this.name = 'ChaveInvalidaError';
   }
 }

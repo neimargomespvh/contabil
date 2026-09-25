@@ -17,6 +17,19 @@ describe('LancamentosService', () => {
         findFirst: jest.fn(),
         findMany: jest.fn(),
       },
+      empresa: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'e1',
+          tenantId: 't1',
+          deletedAt: null,
+        }),
+      },
+      conta: {
+        findMany: jest.fn().mockResolvedValue([
+          { id: 'c1', aceitaLancamento: true, status: 'ATIVO' },
+          { id: 'c2', aceitaLancamento: true, status: 'ATIVO' },
+        ]),
+      },
       fechamentoPeriodo: { findUnique: jest.fn().mockResolvedValue(null) },
       $transaction: jest.fn((fn: any) => fn(prisma)),
     };
@@ -58,7 +71,9 @@ describe('LancamentosService', () => {
       ],
     };
 
-    await expect(service.criar('t1', dtoInvalido)).rejects.toThrow(BadRequestException);
+    await expect(service.criar('t1', dtoInvalido)).rejects.toThrow(
+      BadRequestException,
+    );
   });
 
   it('rejeita lançamento com menos de 2 partidas', async () => {
@@ -67,11 +82,32 @@ describe('LancamentosService', () => {
       partidas: [{ contaId: 'c1', tipo: TipoPartidaDto.D, valor: 100 }],
     };
 
-    await expect(service.criar('t1', dtoInvalido)).rejects.toThrow(BadRequestException);
+    await expect(service.criar('t1', dtoInvalido)).rejects.toThrow(
+      BadRequestException,
+    );
   });
 
   it('rejeita período fechado', async () => {
-    prisma.fechamentoPeriodo.findUnique.mockResolvedValue({ status: 'FECHADO' });
-    await expect(service.criar('t1', dtoValido)).rejects.toThrow(BadRequestException);
+    prisma.fechamentoPeriodo.findUnique.mockResolvedValue({
+      status: 'FECHADO',
+    });
+    await expect(service.criar('t1', dtoValido)).rejects.toThrow(
+      BadRequestException,
+    );
+  });
+
+  it('rejeita empresa inexistente', async () => {
+    prisma.empresa.findFirst.mockResolvedValue(null);
+    await expect(service.criar('t1', dtoValido)).rejects.toThrow();
+  });
+
+  it('rejeita conta que não aceita lançamento', async () => {
+    prisma.conta.findMany.mockResolvedValue([
+      { id: 'c1', aceitaLancamento: false, status: 'ATIVO' },
+      { id: 'c2', aceitaLancamento: true, status: 'ATIVO' },
+    ]);
+    await expect(service.criar('t1', dtoValido)).rejects.toThrow(
+      BadRequestException,
+    );
   });
 });

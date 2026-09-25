@@ -11,7 +11,7 @@ export class CteParser {
       numero: infCte.ide.nCT, serie: infCte.ide.serie, modelo: '57',
       emitenteCnpj: infCte.emit.CNPJ, emitenteNome: infCte.emit.xNome,
       dataEmissao: new Date(infCte.ide.dhEmi),
-      valorTotal: parseFloat(infCte.vPrest?.vTPrest ?? '0'), itens: [], xmlRaw: xml,
+      valorTotal: parseFloat(infCte.vPrest?.vTPrest ?? '0'), situacao: 'AUTORIZADA', itens: [], xmlRaw: xml,
     };
   }
 }

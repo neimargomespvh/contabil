@@ -11,7 +11,6 @@ import { S3Service } from '../../../infra/s3/s3.service';
 import { DocumentoFiscalParser } from '../parsers';
 import {
   DocumentoFiscalParseado,
-  DocumentoDuplicadoError,
   XmlMalformadoError,
 } from '../parsers/interfaces';
 import { ContabilizacaoService } from './contabilizacao.service';
@@ -29,13 +28,11 @@ export class ImportacaoService {
   ) {}
 
   async importarXml(tenantId: string, dto: ImportarXmlDto) {
-    // 1. Validar empresa
     const empresa = await this.prisma.empresa.findFirst({
       where: { id: dto.empresaId, tenantId, deletedAt: null },
     });
     if (!empresa) throw new NotFoundException('Empresa não encontrada');
 
-    // 2. Parsear o XML
     let doc: DocumentoFiscalParseado;
     try {
       doc = await this.parser.parse(dto.xml);
@@ -43,10 +40,11 @@ export class ImportacaoService {
       if (err instanceof XmlMalformadoError) {
         throw new BadRequestException(`XML inválido: ${err.message}`);
       }
-      throw new BadRequestException(`Erro ao processar XML: ${(err as Error).message}`);
+      throw new BadRequestException(
+        `Erro ao processar XML: ${(err as Error).message}`,
+      );
     }
 
-    // 3. Verificar duplicidade
     const existente = await this.prisma.documentoFiscal.findFirst({
       where: { tenantId, chaveAcesso: doc.chaveAcesso },
     });
@@ -56,12 +54,10 @@ export class ImportacaoService {
       );
     }
 
-    // 4. Calcular hash e fazer upload no S3
     const hash = createHash('sha256').update(dto.xml).digest('hex');
     const s3Key = this.montarS3Key(tenantId, dto.empresaId, doc, hash);
     await this.s3.upload(s3Key, dto.xml, 'application/xml');
 
-    // 5. Persistir no banco
     const documento = await this.prisma.$transaction(async (tx) => {
       if (existente && dto.sobrescrever) {
         return tx.documentoFiscal.update({
@@ -91,7 +87,7 @@ export class ImportacaoService {
           valorIss: doc.valorIss,
           cfopPrincipal: doc.cfopPrincipal,
           ncmPrincipal: doc.ncmPrincipal,
-          situacao: 'AUTORIZADA',
+          situacao: doc.situacao,
           xmlS3Key: s3Key,
           xmlHash: hash,
           itens: doc.itens?.length
@@ -118,9 +114,12 @@ export class ImportacaoService {
       });
     });
 
-    // 6. Contabilizar automaticamente (se solicitado)
     let lancamentoId: string | null = null;
-    if (dto.contabilizarAutomaticamente !== false) {
+    const deveContabilizar =
+      dto.contabilizarAutomaticamente !== false &&
+      doc.situacao === 'AUTORIZADA';
+
+    if (deveContabilizar) {
       try {
         lancamentoId = await this.contabilizacao.contabilizar(
           tenantId,
@@ -174,6 +173,7 @@ export class ImportacaoService {
       valorIss: doc.valorIss,
       cfopPrincipal: doc.cfopPrincipal,
       ncmPrincipal: doc.ncmPrincipal,
+      situacao: doc.situacao,
       xmlS3Key: s3Key,
       xmlHash: hash,
     };

@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
-
+import { RegrasContabilizacaoModule } from './modules/regras-contabilizacao/regras-contabilizacao.module';
 import configuration from './config/configuration';
 import { PrismaModule } from './infra/prisma/prisma.module';
 import { RedisModule } from './infra/redis/redis.module';
@@ -61,6 +61,7 @@ import { AuditInterceptor } from './common/interceptors/audit.interceptor';
     ApuracoesModule,
     RelatoriosModule,
     HealthModule,
+    RegrasContabilizacaoModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

@@ -1,3 +1,7 @@
+ATUALIZAR GIT
+git add .
+git commit -m "feat: MVP contábil com auth, empresas, plano de contas e lançamentos"
+
 # Subir tudo
 ~/contabil-start.sh
 
